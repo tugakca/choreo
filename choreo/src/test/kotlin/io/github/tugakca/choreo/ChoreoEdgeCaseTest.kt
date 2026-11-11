@@ -18,16 +18,23 @@ package io.github.tugakca.choreo
 
 import android.provider.Settings
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -38,6 +45,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
@@ -228,5 +237,47 @@ class ChoreoEdgeCaseTest {
         rule.mainClock.advanceTimeBy(100)
         assertThat(choreography!!.state).isEqualTo(ChoreoState.Playing)
         assertThat(choreography!!.positionMillis).isLessThan(frozen)
+    }
+
+    /** The real scenario behind the saved-state fix: a lazy list item scrolled off mid-play and back. */
+    @Test
+    fun lazyListItemScrolledOffMidPlayComesBackPlaying() {
+        val list = LazyListState()
+        lateinit var scope: CoroutineScope
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            scope = rememberCoroutineScope()
+            LazyColumn(Modifier.size(200.dp), state = list) {
+                item(key = "demo") { Moving(ReducedMotionPolicy.AlwaysPlay) }
+                items(50) { Box(Modifier.fillMaxWidth().height(100.dp)) }
+            }
+        }
+        rule.mainClock.advanceTimeBy(300)
+        val first = choreography!!
+        rule.runOnIdle { scope.launch { list.scrollToItem(20) } }
+        rule.mainClock.advanceTimeBy(100)
+        assertThat(first.state).isEqualTo(ChoreoState.Cancelled)
+        rule.runOnIdle { scope.launch { list.scrollToItem(0) } }
+        rule.mainClock.advanceTimeBy(100)
+        val restored = choreography!!
+        assertThat(restored).isNotSameInstanceAs(first)
+        assertThat(restored.state).isEqualTo(ChoreoState.Playing)
+        assertThat(restored.positionMillis).isAtLeast(280)
+    }
+
+    /** The one-line snippets the Gallery shows (center 48,48, size 25) must compile against the real API. */
+    @Test
+    fun galleryCodeLinesCompile() {
+        val root = GroupNode(parallel = false)
+        val scope = ChoreographyScope(root).apply {
+            circle(25f, Offset(48f, 48f))
+            rectangle(Size(40f, 30f), Offset(48f, 48f))
+            roundedRectangle(Size(40f, 30f), 10f, Offset(48f, 48f))
+            line(Offset(23f, 73f), Offset(73f, 23f))
+            polygon(6, 25f, Offset(48f, 48f))
+            star(5, 30f, center = Offset(48f, 48f))
+            svgPath("M0 40 L20 0 L40 30 L60 0 L80 40", Offset(48f, 48f))
+        }
+        assertThat(scope.shapes).hasSize(7)
     }
 }

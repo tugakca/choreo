@@ -23,9 +23,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -42,6 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
 import io.github.tugakca.choreo.ExperimentalChoreoApi
 import io.github.tugakca.choreo.LocalReducedMotionPolicy
 import io.github.tugakca.choreo.ReducedMotionPolicy
@@ -70,7 +75,7 @@ fun SampleApp() {
                         selected = it == destination,
                         onClick = { destination = it },
                         icon = { Icon(it.icon, contentDescription = null) },
-                        label = { Text(it.label, maxLines = 1) },
+                        label = { NavLabel(it.label) },
                         alwaysShowLabel = true,
                     )
                 }
@@ -128,3 +133,18 @@ fun SampleApp() {
 }
 
 private fun pauseAllLabel(pausedAll: Boolean) = if (pausedAll) "Play all animations" else "Pause all animations"
+
+/**
+ * Navigation label that stays on one line and shrinks its font when the label does not fit
+ * (for example "Playground" at a 150% font scale) instead of wrapping or clipping.
+ */
+@Composable
+private fun NavLabel(text: String) {
+    val style = LocalTextStyle.current
+    BasicText(
+        text = text,
+        style = style.copy(color = LocalContentColor.current),
+        maxLines = 1,
+        autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = style.fontSize),
+    )
+}

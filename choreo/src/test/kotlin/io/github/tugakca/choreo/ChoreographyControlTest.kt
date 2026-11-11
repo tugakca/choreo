@@ -175,4 +175,34 @@ class ChoreographyControlTest {
         assertThat(restored.state).isEqualTo(ChoreoState.Playing)
         assertThat(restored.positionMillis).isEqualTo(400)
     }
+
+    @Test
+    fun seekToTheEndOfAnInfiniteTimelineReportsFullProgress() {
+        val choreography = create(iterations = ChoreoDefaults.INFINITE)
+        choreography.seek(1f)
+        assertThat(choreography.progress).isEqualTo(1f)
+    }
+
+    @Test
+    fun disposeKeepsTheStateToSaveAndStaysSilent() {
+        val choreography = create().also { it.play() }
+        choreography.tick(300)
+        choreography.dispose()
+        assertThat(choreography.state).isEqualTo(ChoreoState.Cancelled)
+        assertThat(choreography.snapshot().second).isEqualTo(ChoreoState.Playing)
+        assertThat(ends).isEmpty()
+    }
+
+    @Test
+    fun shapeHandleOfAnotherChoreographyIsRejected() {
+        var foreign: ShapeHandle? = null
+        ChoreographyScope(GroupNode(parallel = false)).apply { foreign = circle(5f) }
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            ChoreographyScope(GroupNode(parallel = false)).apply {
+                circle(5f)
+                foreign!!.scaleTo(2f)
+            }
+        }
+        assertThat(error).hasMessageThat().contains("different choreography")
+    }
 }

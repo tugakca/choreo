@@ -129,7 +129,7 @@ class ChoreoCanvasTest {
         rule.runOnIdle { show = false }
         rule.mainClock.advanceTimeBy(100)
         assertThat(choreography!!.state).isEqualTo(ChoreoState.Cancelled)
-        assertThat(ends).containsExactly(ChoreoEndReason.Cancelled)
+        assertThat(ends).isEmpty()
     }
 
     @Test

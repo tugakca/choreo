@@ -70,7 +70,7 @@ fun SampleApp() {
                         selected = it == destination,
                         onClick = { destination = it },
                         icon = { Icon(it.icon, contentDescription = null) },
-                        label = { Text(it.label) },
+                        label = { Text(it.label, maxLines = 1) },
                         alwaysShowLabel = true,
                     )
                 }

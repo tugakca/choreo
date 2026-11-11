@@ -52,15 +52,15 @@ internal annotation class ChoreoDsl
  * changing, the new one starts from the property's current value and takes over; the value never jumps.
  */
 @ChoreoDsl
-public abstract class StepScope internal constructor(internal val group: GroupNode) {
+public abstract class StepScope internal constructor(internal val group: GroupNode, private val root: GroupNode) {
     /** Runs the steps in [block] one after another. */
     public fun sequence(block: StepScope.() -> Unit) {
-        group.children += GroupNode(parallel = false).also { GroupScope(it).block() }
+        group.children += GroupNode(parallel = false).also { GroupScope(it, root).block() }
     }
 
     /** Runs the steps in [block] at the same time; it lasts as long as its longest step. */
     public fun parallel(block: StepScope.() -> Unit) {
-        group.children += GroupNode(parallel = true).also { GroupScope(it).block() }
+        group.children += GroupNode(parallel = true).also { GroupScope(it, root).block() }
     }
 
     /** Waits for [durationMillis] before the next step of a sequence. */
@@ -133,7 +133,7 @@ public abstract class StepScope internal constructor(internal val group: GroupNo
         require(color.isSpecified) { "colorTo: color must be specified" }
         group.children += AnimNode(
             AnimSpec(
-                "colorTo", index, Channel.Color, 0f, color, null,
+                "colorTo", ownedIndex("colorTo"), Channel.Color, 0f, color, null,
                 validated(
                     "colorTo",
                     durationMillis,
@@ -200,6 +200,11 @@ public abstract class StepScope internal constructor(internal val group: GroupNo
         group.children += both
     }
 
+    private fun ShapeHandle.ownedIndex(name: String): Int {
+        require(owner === root) { "$name: this ShapeHandle was created by a different choreography" }
+        return index
+    }
+
     private fun ShapeHandle.spec(
         name: String,
         channel: Channel,
@@ -211,7 +216,7 @@ public abstract class StepScope internal constructor(internal val group: GroupNo
         easing: Easing,
     ): AnimNode = AnimNode(
         AnimSpec(
-            name, index, channel, to, Color.Unspecified, from,
+            name, ownedIndex(name), channel, to, Color.Unspecified, from,
             validated(
                 name,
                 durationMillis,
@@ -236,7 +241,7 @@ public abstract class StepScope internal constructor(internal val group: GroupNo
     }
 }
 
-internal class GroupScope(group: GroupNode) : StepScope(group)
+internal class GroupScope(group: GroupNode, root: GroupNode) : StepScope(group, root)
 
 /**
  * Receiver of the [rememberChoreography] block. Declare shapes first, then describe the animations;
@@ -245,7 +250,7 @@ internal class GroupScope(group: GroupNode) : StepScope(group)
  * Positions are given in the choreography unit (dp by default) with the origin at the top-left of the
  * [ChoreoCanvas]. A shape's position is its center, which is also the pivot of scaling and rotation.
  */
-public class ChoreographyScope internal constructor(root: GroupNode) : StepScope(root) {
+public class ChoreographyScope internal constructor(private val root: GroupNode) : StepScope(root, root) {
     internal val shapes = mutableListOf<ShapeSpec>()
 
     /** Adds a circle of [radius] centered at [center]. */
@@ -306,7 +311,7 @@ public class ChoreographyScope internal constructor(root: GroupNode) : StepScope
     private fun add(path: Path, center: Offset, style: ShapeStyle): ShapeHandle {
         require(center.x.isFinite() && center.y.isFinite()) { "shape center must be finite but was $center" }
         shapes += ShapeSpec(path, style, center.x, center.y)
-        return ShapeHandle(shapes.size - 1)
+        return ShapeHandle(shapes.size - 1, root)
     }
 
     private companion object {

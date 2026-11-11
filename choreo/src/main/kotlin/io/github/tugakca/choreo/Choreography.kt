@@ -36,7 +36,7 @@ public enum class ChoreoState {
     /** Reached the end (or was jumped to the final frame by reduced motion). */
     Finished,
 
-    /** Stopped by [Choreography.cancel] or by leaving the composition. */
+    /** Stopped by [Choreography.cancel], or silently by leaving the composition. */
     Cancelled,
 }
 
@@ -45,7 +45,7 @@ public enum class ChoreoEndReason {
     /** The timeline reached its end. */
     Finished,
 
-    /** [Choreography.cancel] was called, or the choreography left the composition while active. */
+    /** [Choreography.cancel] was called. Leaving the composition does not report this. */
     Cancelled,
 }
 
@@ -79,6 +79,8 @@ public class Choreography internal constructor(
     public var state: ChoreoState by mutableStateOf(ChoreoState.Idle)
         private set
 
+    private var stateBeforeDispose: ChoreoState? = null
+
     internal var onEnd: (ChoreoEndReason) -> Unit = {}
 
     /** True when the final frame must be shown instead of playing (system setting or policy). */
@@ -105,12 +107,12 @@ public class Choreography internal constructor(
             val duration = timeline.durationMillis
             if (duration == 0L) return if (state == ChoreoState.Finished) 1f else 0f
             val position = timeNanos.toDouble() / NANOS_PER_MILLI
-            if (timeline.isInfinite &&
-                state != ChoreoState.Finished
-            ) {
-                return ((position % duration) / duration).toFloat()
+            val fraction = position / duration
+            // Infinite timelines wrap, but exactly the end (seek(1f)) stays 1.
+            if (timeline.isInfinite && fraction > 1.0 && state != ChoreoState.Finished) {
+                return (fraction % 1.0).toFloat()
             }
-            return (position / duration).coerceIn(0.0, 1.0).toFloat()
+            return fraction.coerceIn(0.0, 1.0).toFloat()
         }
 
     /** The animations of this choreography, one per DSL call, in declaration order with their placement. */
@@ -119,7 +121,7 @@ public class Choreography internal constructor(
         get() = timeline.placed
             // moveTo, drawOn and friends animate several properties; report them once.
             .distinctBy { listOf(it.spec.name, it.spec.shape, it.startMillis, it.endMillis) }
-            .map { ChoreoStep(it.spec.name, ShapeHandle(it.spec.shape), it.startMillis, it.endMillis) }
+            .map { ChoreoStep(it.spec.name, ShapeHandle(it.spec.shape, this), it.startMillis, it.endMillis) }
 
     /**
      * Starts playing from the current position. A finished, cancelled or fully played choreography
@@ -183,12 +185,20 @@ public class Choreography internal constructor(
         if (atEnd()) finish()
     }
 
-    /** Called when the choreography leaves the composition. */
-    internal fun dispose() = cancel()
+    /**
+     * Called when the choreography leaves the composition. It stops silently (no `onEnd`): the same
+     * choreography is often restored right away from saved state (rotation, lazy lists), so reporting
+     * a cancellation would be misleading. The state before leaving is what gets saved.
+     */
+    internal fun dispose() {
+        if (state != ChoreoState.Playing && state != ChoreoState.Paused) return
+        stateBeforeDispose = state
+        state = ChoreoState.Cancelled
+    }
 
     internal fun frameTimeMillis(): Double = timeNanos.toDouble() / NANOS_PER_MILLI
 
-    internal fun snapshot(): Pair<Long, ChoreoState> = timeNanos to state
+    internal fun snapshot(): Pair<Long, ChoreoState> = timeNanos to (stateBeforeDispose ?: state)
 
     internal fun restore(timeNanos: Long, state: ChoreoState) {
         this.timeNanos = timeNanos
@@ -218,7 +228,7 @@ public class Choreography internal constructor(
 }
 
 /** Identifies a shape created in a [ChoreographyScope]; pass it to animation functions. */
-public class ShapeHandle internal constructor(internal val index: Int)
+public class ShapeHandle internal constructor(internal val index: Int, internal val owner: Any)
 
 /**
  * Placement of one animation on the timeline, for tools such as timeline views.

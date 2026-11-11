@@ -63,9 +63,9 @@ fun GalleryScreen(
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val items = if (tab == 0) {
-        DemoShape.entries.map { GalleryItem(it.label, it.code, it, null) }
+        DemoShape.entries.map { GalleryItem(it.label, it.code(GALLERY_CENTER, GALLERY_SIZE), it, null) }
     } else {
-        DemoAnimation.entries.map { GalleryItem(it.code, "star.${it.code}(…)", animationShape(it), it) }
+        DemoAnimation.entries.map { GalleryItem(it.code, animationCode(it), animationShape(it), it) }
     }
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (isLargeText) 1 else 2),
@@ -119,8 +119,8 @@ private fun GalleryCard(item: GalleryItem, pausedAll: Boolean, colors: DemoColor
     val choreography = rememberDemo(item.shape, item.animation, colors, pausedAll = pausedAll) {
         val shape = addShape(
             item.shape,
-            center = Offset(48f, 48f),
-            size = 26f,
+            center = GALLERY_CENTER,
+            size = GALLERY_SIZE,
             color = colors.primary,
             mode = if (outlineOnly(item)) PaintMode.Stroke else PaintMode.Fill,
         )
@@ -154,3 +154,19 @@ private fun GalleryCard(item: GalleryItem, pausedAll: Boolean, colors: DemoColor
 
 private fun outlineOnly(item: GalleryItem): Boolean =
     item.shape.strokeOnly || item.animation == DemoAnimation.DrawOn || item.animation == DemoAnimation.EraseOff
+
+private val GALLERY_CENTER = Offset(48f, 48f)
+private const val GALLERY_SIZE = 25f
+
+private fun animationCode(animation: DemoAnimation): String {
+    val receiver = animationShape(animation).name.replaceFirstChar { it.lowercase() }
+    val args = when (animation) {
+        DemoAnimation.MoveTo -> "Offset(72f, 48f), 900"
+        DemoAnimation.ScaleTo -> "1.6f, 900"
+        DemoAnimation.RotateTo -> "180f, 900"
+        DemoAnimation.FadeTo -> "0.2f, 900"
+        DemoAnimation.ColorTo -> "tertiary, 900"
+        DemoAnimation.DrawOn, DemoAnimation.EraseOff -> "900"
+    }
+    return "$receiver.${animation.code}($args)"
+}

@@ -116,9 +116,15 @@ fun PlayPauseButton(choreography: Choreography) {
 }
 
 private fun timeLabel(choreography: Choreography): String {
-    val position = choreography.positionMillis / 1000f
-    val total = choreography.durationMillis / 1000f
-    return "%.2f / %.1f s".format(position.coerceAtMost(total), total)
+    val duration = choreography.durationMillis
+    val millis = if (choreography.isInfinite &&
+        duration > 0
+    ) {
+        choreography.positionMillis % duration
+    } else {
+        choreography.positionMillis
+    }
+    return "%.2f / %.1f s".format(millis.coerceAtMost(duration) / 1000f, duration / 1000f)
 }
 
 @Composable
@@ -162,7 +168,7 @@ fun MonoLine(text: String, modifier: Modifier = Modifier) {
         style = CodeStyle,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
-        overflow = TextOverflow.Clip,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 

@@ -37,7 +37,8 @@ import kotlinx.coroutines.flow.first
  * The [block] runs once: recomposition never resets a running animation. It runs again (and the
  * animation restarts) only when one of [keys] changes. Position and play state survive configuration
  * changes such as screen rotation. The clock stops while the app is in the background, and the
- * choreography is cancelled when it leaves the composition.
+ * choreography stops (state [ChoreoState.Cancelled], without calling [onEnd]) when it leaves the composition,
+ * and its pre-exit state is what gets saved, so it can come back playing.
  *
  * @param keys Values the choreography depends on; a change rebuilds it.
  * @param autoPlay Start playing as soon as it is created (default `true`). Only read on creation.

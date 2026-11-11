@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -38,7 +39,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import org.junit.Assert.assertThrows
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -115,7 +115,6 @@ class ChoreoEdgeCaseTest {
      * Lazy lists and navigation keep item state in a SaveableStateHolder. An item scrolled off while
      * playing must not come back stuck in Cancelled.
      */
-    @Ignore("Known bug: dispose() cancels before SaveableStateHolder saves, so the item is restored as Cancelled")
     @Test
     fun itemScrolledOffAndBackIsNotStuckCancelled() {
         var show by mutableStateOf(true)
@@ -127,9 +126,13 @@ class ChoreoEdgeCaseTest {
         rule.mainClock.advanceTimeBy(300)
         rule.runOnIdle { show = false }
         rule.mainClock.advanceTimeBy(100)
-        rule.runOnIdle { show = true }
+        rule.runOnIdle {
+            show = true
+            Snapshot.sendApplyNotifications()
+        }
         rule.mainClock.advanceTimeBy(100)
-        assertThat(choreography!!.state).isNotEqualTo(ChoreoState.Cancelled)
+        assertThat(choreography!!.state).isEqualTo(ChoreoState.Playing)
+        assertThat(choreography!!.positionMillis).isAtLeast(280)
     }
 
     @Test

@@ -4,7 +4,8 @@ plugins {
 }
 
 group = "com.github.tugakca.choreo"
-version = "0.1.0"
+// JitPack passes the tag (for example v0.1.0) in VERSION.
+version = System.getenv("VERSION")?.removePrefix("v") ?: "0.1.0"
 
 kotlin {
     explicitApi()
@@ -48,7 +49,7 @@ afterEvaluate {
                 pom {
                     name = "Choreo"
                     description = "Shape drawing and animation choreography for Jetpack Compose."
-                    url = "https://github.com/tugakca/Choreo"
+                    url = "https://github.com/tugakca/choreo"
                     licenses {
                         license {
                             name = "The Apache License, Version 2.0"
@@ -56,7 +57,7 @@ afterEvaluate {
                         }
                     }
                     scm {
-                        url = "https://github.com/tugakca/Choreo"
+                        url = "https://github.com/tugakca/choreo"
                     }
                 }
             }

@@ -65,12 +65,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.tugakca.choreo.ChoreoCanvas
 import io.github.tugakca.choreo.ChoreoDefaults
 import io.github.tugakca.choreo.PaintMode
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /** Everything the Playground lets the user change; lives above the destinations so it survives tab switches. */
@@ -122,6 +124,17 @@ fun PlaygroundScreen(
     contentPadding: PaddingValues,
 ) {
     val easing = DemoEasings[state.easingIndex]
+    // Low windows (landscape) and large text get a smaller scene so the parameters stay reachable.
+    val lowWindow = LocalConfiguration.current.screenHeightDp < 480
+    val sceneHeight = when {
+        lowWindow -> 100.dp
+        isLargeText -> 130.dp
+        else -> 170.dp
+    }
+    // The scene reserves a strip on top for its labels; the canvas gets the rest.
+    val canvasHeight = minOf(120f, sceneHeight.value - 36f)
+    val centerY = canvasHeight / 2f
+    val shapeSize = minOf(30f, canvasHeight * 0.3f)
     val outline = state.animation == DemoAnimation.DrawOn || state.animation == DemoAnimation.EraseOff
     val choreography = rememberDemo(
         state.shape,
@@ -131,13 +144,14 @@ fun PlaygroundScreen(
         state.easingIndex,
         state.iterations,
         colors,
+        canvasHeight,
         pausedAll = pausedAll,
     ) {
         val moving = state.animation == DemoAnimation.MoveTo
         val shape = addShape(
             state.shape,
-            center = Offset(if (moving) 60f else 110f, 60f),
-            size = 30f,
+            center = Offset(if (moving) 60f else 110f, centerY),
+            size = shapeSize,
             color = colors.primary,
             mode = if (outline || state.shape.strokeOnly) PaintMode.Stroke else PaintMode.Fill,
         )
@@ -149,7 +163,7 @@ fun PlaygroundScreen(
             state.delayMillis,
             easing.easing,
             state.iterations,
-            moveTarget = Offset(160f, 60f),
+            moveTarget = Offset(160f, centerY),
         )
     }
     val code =
@@ -160,8 +174,9 @@ fun PlaygroundScreen(
             state.delayMillis,
             state.easingIndex,
             state.iterations,
+            centerY,
         ) {
-            playgroundCode(state)
+            playgroundCode(state, centerY)
         }
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
@@ -169,36 +184,37 @@ fun PlaygroundScreen(
     Column(
         Modifier
             .fillMaxSize()
+            // In a low window there is no room for a fixed block, so the whole screen scrolls.
+            .then(if (lowWindow) Modifier.verticalScroll(rememberScrollState()) else Modifier)
             .padding(top = contentPadding.calculateTopPadding())
             .padding(horizontal = 16.dp),
     ) {
         // Fixed block: the scene and transport stay put while the parameters scroll.
-        Scene(height = if (isLargeText) 130.dp else 170.dp) {
+        Scene(height = sceneHeight) {
             ChoreoCanvas(
                 choreography,
-                Modifier.size(220.dp, 120.dp),
+                Modifier.size(220.dp, canvasHeight.dp).align(Alignment.BottomCenter),
                 contentDescription = "${state.shape.label}, ${state.animation.code}",
             )
             Text(
                 "${state.animation.code} · ${state.durationMillis} ms",
                 style = CodeStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
             )
             if (state.iterations == ChoreoDefaults.INFINITE) {
                 Text(
                     "Looping",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                 )
             }
         }
         Transport(choreography)
         Column(
             Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
+                .then(if (lowWindow) Modifier else Modifier.weight(1f).verticalScroll(rememberScrollState()))
                 .padding(bottom = contentPadding.calculateBottomPadding() + 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -218,7 +234,8 @@ fun PlaygroundScreen(
                     )
                 }
             }
-            SliderRow("Duration", state.durationMillis, 100..3000) { state.durationMillis = it }
+            // At least 350 ms: an infinite loop then changes at most 3 times per second (no flashing).
+            SliderRow("Duration", state.durationMillis, 350..3000) { state.durationMillis = it }
             SliderRow("Delay", state.delayMillis, 0..2000) { state.delayMillis = it }
             EasingDropdown(state.easingIndex) { state.easingIndex = it }
             Text("Repeat", style = MaterialTheme.typography.labelLarge)
@@ -263,7 +280,7 @@ private fun SliderRow(label: String, value: Int, range: IntRange, onChange: (Int
         }
         Slider(
             value = value.toFloat(),
-            onValueChange = { onChange((it / 100).toInt() * 100) },
+            onValueChange = { onChange(((it / 50).roundToInt() * 50).coerceIn(range)) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
             modifier = Modifier.semantics { contentDescription = "$label in milliseconds" },
         )
@@ -293,10 +310,10 @@ private fun EasingDropdown(selected: Int, onSelect: (Int) -> Unit) {
     }
 }
 
-private fun playgroundCode(state: PlaygroundState): List<String> {
+private fun playgroundCode(state: PlaygroundState, centerY: Float): List<String> {
     val receiver = state.shape.name.replaceFirstChar { it.lowercase() }
     val args = buildList {
-        if (state.animation == DemoAnimation.MoveTo) add("target = Offset(160f, 60f)")
+        if (state.animation == DemoAnimation.MoveTo) add("target = Offset(160f, ${centerY.toInt()}f)")
         if (state.animation == DemoAnimation.ScaleTo) add("scale = 1.6f")
         if (state.animation == DemoAnimation.RotateTo) add("degrees = 180f")
         if (state.animation == DemoAnimation.FadeTo) add("alpha = 0.2f")

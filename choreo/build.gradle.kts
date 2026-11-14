@@ -3,7 +3,7 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.tugakca.choreo"
+group = "com.github.tugakca"
 // JitPack passes the tag (for example v0.1.0) in VERSION.
 version = System.getenv("VERSION")?.removePrefix("v") ?: "0.1.0"
 

@@ -1,5 +1,7 @@
 # Choreo
 
+[![JitPack](https://jitpack.io/v/tugakca/choreo.svg)](https://jitpack.io/#tugakca/choreo)
+
 Draw shapes. Choreograph motion. One timeline, pure Compose.
 
 Choreo is an open-source library for Jetpack Compose that draws shapes and animates them with a small
@@ -27,7 +29,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts of your module
 dependencies {
-    implementation("com.github.tugakca.choreo:choreo:v0.1.0")
+    implementation("com.github.tugakca:choreo:v0.1.0")
 }
 ```
 
